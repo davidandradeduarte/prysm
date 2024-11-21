@@ -3,6 +3,7 @@ package monitor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"sync"
 
@@ -48,6 +49,46 @@ type ValidatorAggregatedPerformance struct {
 	totalAggregations               uint64
 	totalSyncCommitteeContributions uint64
 	totalSyncCommitteeAggregations  uint64
+	totalSuccessfulAttestations     uint64
+	totalFailedAttestations         uint64
+	failedAttestationReasons        map[string]FailedAttestationReason
+	attFailLock                     sync.Mutex
+}
+
+// Failed attestation reason contains the total count of failed attestations
+// and the list of errors that caused the attestation to fail.
+type FailedAttestationReason struct {
+	totalCount int
+	errors     []error
+}
+
+// Fail increments the total count of failed attestations and adds the error
+// to the list of errors that caused the attestation to fail.
+func (a *ValidatorAggregatedPerformance) Fail(err error, errStr string) {
+	a.attFailLock.Lock()
+	defer a.attFailLock.Unlock()
+	a.totalFailedAttestations++
+	if v, ok := a.failedAttestationReasons[errStr]; ok {
+		v.totalCount++
+		v.errors = append(v.errors, err)
+	} else {
+		a.failedAttestationReasons[errStr] = FailedAttestationReason{
+			totalCount: 1,
+			errors:     []error{err},
+		}
+	}
+	log.WithError(err).Error(errStr)
+}
+
+func (a *ValidatorAggregatedPerformance) GetFailedAttestationReasonsStr() string {
+	var errStr string
+	for reason, reasonInfo := range a.failedAttestationReasons {
+		errStr += fmt.Sprintf("%s: %d\n", reason, reasonInfo.totalCount)
+		for _, err := range reasonInfo.errors {
+			errStr += fmt.Sprintf("\t%s\n", err.Error())
+		}
+	}
+	return errStr
 }
 
 // ValidatorMonitorConfig contains the list of validator indices that the
@@ -162,8 +203,9 @@ func (s *Service) initializePerformanceStructures(state state.BeaconState, epoch
 			balance = 0
 		}
 		s.aggregatedPerformance[idx] = ValidatorAggregatedPerformance{
-			startEpoch:   epoch,
-			startBalance: balance,
+			startEpoch:               epoch,
+			startBalance:             balance,
+			failedAttestationReasons: make(map[string]FailedAttestationReason),
 		}
 		s.latestPerformance[idx] = ValidatorLatestPerformance{
 			balance: balance,

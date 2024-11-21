@@ -162,19 +162,22 @@ func (s *Service) logAggregatedPerformance() {
 		percentCorrectTarget := float64(p.totalCorrectTarget) / float64(p.totalAttestedCount)
 
 		log.WithFields(logrus.Fields{
-			"validatorIndex":           idx,
-			"startEpoch":               p.startEpoch,
-			"startBalance":             p.startBalance,
-			"totalRequested":           p.totalRequestedCount,
-			"attestationInclusion":     fmt.Sprintf("%.2f%%", percentAtt*100),
-			"balanceChangePct":         fmt.Sprintf("%.2f%%", percentBal*100),
-			"correctlyVotedSourcePct":  fmt.Sprintf("%.2f%%", percentCorrectSource*100),
-			"correctlyVotedTargetPct":  fmt.Sprintf("%.2f%%", percentCorrectTarget*100),
-			"correctlyVotedHeadPct":    fmt.Sprintf("%.2f%%", percentCorrectHead*100),
-			"averageInclusionDistance": fmt.Sprintf("%.1f", percentDistance),
-			"totalProposedBlocks":      p.totalProposedCount,
-			"totalAggregations":        p.totalAggregations,
-			"totalSyncContributions":   p.totalSyncCommitteeContributions,
+			"validatorIndex":              idx,
+			"startEpoch":                  p.startEpoch,
+			"startBalance":                p.startBalance,
+			"totalRequested":              p.totalRequestedCount,
+			"attestationInclusion":        fmt.Sprintf("%.2f%%", percentAtt*100),
+			"balanceChangePct":            fmt.Sprintf("%.2f%%", percentBal*100),
+			"correctlyVotedSourcePct":     fmt.Sprintf("%.2f%%", percentCorrectSource*100),
+			"correctlyVotedTargetPct":     fmt.Sprintf("%.2f%%", percentCorrectTarget*100),
+			"correctlyVotedHeadPct":       fmt.Sprintf("%.2f%%", percentCorrectHead*100),
+			"averageInclusionDistance":    fmt.Sprintf("%.1f", percentDistance),
+			"totalProposedBlocks":         p.totalProposedCount,
+			"totalAggregations":           p.totalAggregations,
+			"totalSyncContributions":      p.totalSyncCommitteeContributions,
+			"totalFailedAttestations":     p.totalFailedAttestations,
+			"totalSuccessfulAttestations": p.totalSuccessfulAttestations,
+			"failedAttestationReasons":    p.GetFailedAttestationReasonsStr(),
 		}).Info("Aggregated performance since launch")
 	}
 }

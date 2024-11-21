@@ -74,16 +74,16 @@ func (s *Service) processIncludedAttestation(ctx context.Context, state state.Be
 	for _, idx := range attestingIndices {
 		if s.canUpdateAttestedValidator(primitives.ValidatorIndex(idx), att.GetData().Slot) {
 			logFields := logMessageTimelyFlagsForIndex(primitives.ValidatorIndex(idx), att.GetData())
-			balance, err := state.BalanceAtIndex(primitives.ValidatorIndex(idx))
-			if err != nil {
-				log.WithError(err).Error("Could not get balance")
-				return
-			}
 
 			aggregatedPerf := s.aggregatedPerformance[primitives.ValidatorIndex(idx)]
 			aggregatedPerf.totalAttestedCount++
 			aggregatedPerf.totalRequestedCount++
 
+			balance, err := state.BalanceAtIndex(primitives.ValidatorIndex(idx))
+			if err != nil {
+				aggregatedPerf.Fail(err, "Could not get balance")
+				return
+			}
 			latestPerf := s.latestPerformance[primitives.ValidatorIndex(idx)]
 			balanceChg := int64(balance - latestPerf.balance)
 			latestPerf.balanceChange = balanceChg
@@ -103,32 +103,32 @@ func (s *Service) processIncludedAttestation(ctx context.Context, state state.Be
 					slots.ToEpoch(latestPerf.attestedSlot) {
 					participation, err = state.CurrentEpochParticipation()
 					if err != nil {
-						log.WithError(err).Error("Could not get current epoch participation")
+						aggregatedPerf.Fail(err, "Could not get current epoch participation")
 						return
 					}
 				} else {
 					participation, err = state.PreviousEpochParticipation()
 					if err != nil {
-						log.WithError(err).Error("Could not get previous epoch participation")
+						aggregatedPerf.Fail(err, "Could not get previous epoch participation")
 						return
 					}
 				}
 				flags := participation[idx]
 				hasFlag, err := altair.HasValidatorFlag(flags, sourceIdx)
 				if err != nil {
-					log.WithError(err).Error("Could not get timely Source flag")
+					aggregatedPerf.Fail(err, "Could not get timely Source flag")
 					return
 				}
 				latestPerf.timelySource = hasFlag
 				hasFlag, err = altair.HasValidatorFlag(flags, headIdx)
 				if err != nil {
-					log.WithError(err).Error("Could not get timely Head flag")
+					aggregatedPerf.Fail(err, "Could not get timely Head flag")
 					return
 				}
 				latestPerf.timelyHead = hasFlag
 				hasFlag, err = altair.HasValidatorFlag(flags, targetIdx)
 				if err != nil {
-					log.WithError(err).Error("Could not get timely Target flag")
+					aggregatedPerf.Fail(err, "Could not get timely Target flag")
 					return
 				}
 				latestPerf.timelyTarget = hasFlag
@@ -145,6 +145,8 @@ func (s *Service) processIncludedAttestation(ctx context.Context, state state.Be
 					timelyTargetCounter.WithLabelValues(fmt.Sprintf("%d", idx)).Inc()
 					aggregatedPerf.totalCorrectTarget++
 				}
+
+				aggregatedPerf.totalSuccessfulAttestations++
 			}
 			logFields["correctHead"] = latestPerf.timelyHead
 			logFields["correctSource"] = latestPerf.timelySource
